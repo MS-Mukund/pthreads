@@ -25,15 +25,6 @@ pthread_mutex_t print_lock;
 #define WHT "\x1B[1;37m"
 
 // struct definitions
-enum direction { east = 1, west = 0 };
-
-typedef struct Baboon
-{
-    int id;                     // Unique id for each baboon
-    enum direction dir;         // Direction from which baboon came
-    pthread_t baboon_thread_id; // unique identifier of the thread of a single baboon
-} Baboon;
-
 typedef struct course {
     char *name;         // course name, assumed unique
 

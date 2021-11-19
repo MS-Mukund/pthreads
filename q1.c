@@ -23,7 +23,7 @@ int main()
             scanf("%d", cs[i].labs[j]);
         }
 
-        pthread_create(&(cs[i].course_thr_id, NULL, start_c, &(cs[i]) ), );
+        pthread_create(&(cs[i].course_thr_id), NULL, start_c, &(cs[i]) );
     }
 
     stud st[num_students];
