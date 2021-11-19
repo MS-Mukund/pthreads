@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <semaphore.h>
 #include <string.h>
+#include <assert.h>
 
 // Global variables
 // keeps track of number of ticks passed since start of program
@@ -23,6 +24,7 @@ pthread_mutex_t print_lock;
 #define CYN "\x1B[1;36m"
 #define WHT "\x1B[1;37m"
 
+// struct definitions
 enum direction { east = 1, west = 0 };
 
 typedef struct Baboon
@@ -32,7 +34,18 @@ typedef struct Baboon
     pthread_t baboon_thread_id; // unique identifier of the thread of a single baboon
 } Baboon;
 
-enum stud_state { waiting, attending, finished, exited };
+typedef struct course {
+    char *name;         // course name, assumed unique
+
+    float interest;
+    int max_slots;
+
+    int num_labs;   // number of labs from which we can choose;
+    int *labs;      // array of lab ids
+    pthread_t course_thr_id;
+} course;
+
+enum stud_state { not_registered, waiting, attending, finished, exited };
 typedef struct student {
     int id; 
     int time;    // time after which he fills preferences
@@ -50,3 +63,4 @@ pthread_mutex_t mutex;          // can also be a binary semaphore. Used to lock 
 void init();
 void destroy();
 void *start_stud(void *args);
+void *start_c(void *args);
