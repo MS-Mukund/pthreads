@@ -9,17 +9,6 @@
 #include <stdbool.h>
 #include <errno.h>
 
-// Global variables
-// keeps track of number of ticks passed since start of program
-int ticks = 0;
-
-// lock to print to console
-pthread_mutex_t print_lock = PTHREAD_MUTEX_INITIALIZER;
-
-// semaphores
-sem_t imaginary_lock;
-sem_t *lab_locks;
-
 // Some colors to judge different outputs when running.
 #define NRM "\x1B[1;0m"
 #define RED "\x1B[1;31m"
@@ -30,17 +19,34 @@ sem_t *lab_locks;
 #define CYN "\x1B[1;36m"
 #define WHT "\x1B[1;37m"
 
+// Global variables
+
+// lock to print to console
+pthread_mutex_t print_lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t  scan_sig = PTHREAD_COND_INITIALIZER;
+pthread_mutex_t scan_lock = PTHREAD_MUTEX_INITIALIZER;
+int done = 0;
+
+// semaphores
+sem_t imaginary_lock;
+sem_t *lab_locks;
+
 // struct definitions
 typedef struct course {
     char *name;         // course name, assumed unique
 
     float interest;
     int max_slots;
+    bool removed;
 
     int num_labs;   // number of labs from which we can choose;
     int *labs;      // array of lab ids
 
     sem_t wait_for_seat;
+    int ppl_there;
+    pthread_mutex_t ppl_lock;
+    pthread_cond_t  ppl_sig;
+
     sem_t wait_end_tute;
     pthread_t course_thr_id;
 
@@ -49,7 +55,7 @@ typedef struct course {
     int num_stud;
 } course;
 
-enum stud_state { not_registered, waiting, attending, finished, exited };
+enum stud_state { not_registered, waiting, attending, finished };
 typedef struct student {
 
     int id; 
@@ -70,11 +76,6 @@ typedef struct lab {
     bool *occupied;      // is the TA occupied? 
 } lab;
 
-int waiting[2] = {0, 0};        // Number of baboons waiting from each direction
-int travelling[2] = {0, 0};     // Number of baboons crossing the rope (only one of the direction will have positive value at a time)
-sem_t sem[2];
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;          // can also be a binary semaphore. Used to lock critical sections
-
 lab *all_labs;                 // ptr array of all labs
 course *all_courses;           // ptr array of all courses
 
@@ -82,3 +83,16 @@ void init();
 void destroy();
 void *start_stud(void *args);
 void *start_c(void *args);
+
+void print_E1( int id );
+void print_E2( int id, char *name );
+void print_E3( int id, char *name );
+void print_E4( int id, int priority, char *pref1, char *pref2 );
+void print_E5( int id, char *name );
+void print_E6( int id );
+void print_E7( char *name, int seats );
+void print_E8( char *name, int filled, int seats);
+void print_E9( int ta_id, char *l_name, char *name );
+void print_E10( char *name );
+void print_E11( int ta_id, char *l_name, char *name, int num );
+void print_E12( char *l_name );
