@@ -419,10 +419,21 @@ void print_E10( char *name )
     pthread_mutex_unlock(&print_lock);
 }
 
+
 void print_E11( int ta_id, char *l_name, char *name, int num )
 {
+    char filler[5];
+    if( num == 1)
+        strcpy(filler, "st");
+    else if( num == 2)
+        strcpy(filler, "nd");
+    else if( num == 3)
+        strcpy(filler, "rd");
+    else
+        strcpy(filler, "th");
+    
     pthread_mutex_lock(&print_lock);
-    printf( "TA %d from lab %s has been allocated to course %s for %dth TA ship\n", ta_id, l_name, name, num);
+    printf( "TA %d from lab %s has been allocated to course %s for %d%s TA ship\n", ta_id, l_name, name, num, filler);
     pthread_mutex_unlock(&print_lock);
 }
 

@@ -1,4 +1,4 @@
-#include "q3.h"
+#include "q3_server.h"
 ///////////////////////////////////////////////////
 pair<string, int> read_string_from_socket(const int &fd, int bytes)
 {
@@ -31,12 +31,11 @@ int send_string_on_socket(int fd, const string &s)
 }
 
 ///////////////////////////////
-
-void handle_connection(int client_socket_fd)
+void handle_connection(int *p_client_socket_fd, pthread_t worker_thr_id)
 {
     // int client_socket_fd = *((int *)client_socket_fd_ptr);
     //####################################################
-
+    int client_socket_fd = *p_client_socket_fd;
     int received_num, sent_num;
 
     /* read message from client */
@@ -74,16 +73,186 @@ void handle_connection(int client_socket_fd)
             perror("Error while writing to client. Seems socket has been closed");
             goto close_client_socket_ceremony;
         }
+
+        istringstream args(cmd);
+        string key_str;
+        args >> key_str;
+
+        int index = stoi(key_str);
+
+        string cmd_name;
+        string value;
+        args >> cmd_name;
+        args >> key_str;
+        int key = stoi(key_str);
+        int stat = 0;
+        if( key < 0 || key > 100 )
+        {
+            cout << "Invalid key" << endl;
+            goto close_client_socket_ceremony;
+        }
+
+        if( cmd_name != "delete" || cmd_name != "fetch" )
+            args >> value;
+
+        if( cmd_name == "insert" )
+        {
+            stat = 0;
+            pthread_mutex_lock(&dict_lock[key-1]);
+            if( dictionary[key-1].empty() )
+            {
+                dictionary[key-1] = value;
+                stat = 1;
+            }
+            pthread_mutex_unlock(&dict_lock[key-1]);
+            
+            pthread_mutex_lock(&print_lock);
+            if( stat )
+                cout << index << ":" << worker_thr_id << ":" << "Insertion successful" << endl;
+            else
+                cout << "key already exists" << endl;
+            pthread_mutex_unlock(&print_lock);
+        }
+
+        else if( cmd_name == "concat" )
+        {
+            stat = 0;
+            int key2 = stoi(value);
+            if( key2 < 0 || key2 > 100 )
+            {
+                cout << "Invalid key" << endl;
+                goto close_client_socket_ceremony;
+            }
+            string s1, s2; 
+    
+            pthread_mutex_lock(&dict_lock[key-1]);   
+            pthread_mutex_lock(&dict_lock[key2-1]);
+            if( !dictionary[key-1].empty() && !dictionary[key2-1].empty() )
+            {
+                s1 = dictionary[key-1] + dictionary[key2-1];
+                s2 = dictionary[key2-1] + dictionary[key-1];
+                dictionary[key-1] = s1;
+                dictionary[key2-1] = s2;
+                stat = 1;
+            }
+            pthread_mutex_unlock(&dict_lock[key2-1]);
+            pthread_mutex_unlock(&dict_lock[key-1]);
+            
+            pthread_mutex_lock(&print_lock);
+            if( stat )
+                cout << index << ":" << worker_thr_id << ":" << s2 << endl;
+            else
+                cout << "concat failed as at least one of the keys does not exist" << endl;
+            pthread_mutex_unlock(&print_lock);
+        }
+
+        else if( cmd_name == "update" )
+        { 
+            stat = 0;          
+            pthread_mutex_lock(&dict_lock[key-1]);
+            if( !dictionary[key-1].empty() )
+            {
+                dictionary[key-1] = value;
+                stat = 1;
+            }
+            pthread_mutex_unlock(&dict_lock[key-1]);
+            
+            pthread_mutex_lock(&print_lock);
+            if( stat )
+                cout << index << ":" << worker_thr_id << ":" << value << endl;
+            else
+                cout << "key already exists" << endl;
+            pthread_mutex_unlock(&print_lock);
+        }
+
+        if( cmd_name == "delete" )
+        {
+            stat = 0;
+            pthread_mutex_lock(&dict_lock[key-1]);
+            if( !dictionary[key-1].empty() )      // not empty
+            {
+                dictionary[key-1] = "";
+                stat = 1;
+            }
+            pthread_mutex_unlock(&dict_lock[key-1]);
+            
+            pthread_mutex_lock(&print_lock);
+            if( stat )
+                cout << index << ":" << worker_thr_id << ":" << "Deletion successful" << endl;
+            else
+                cout << "No such key exists" << endl;
+            pthread_mutex_unlock(&print_lock);
+        }
+
+        if( cmd_name == "fetch" )
+        {
+            string val;
+            stat = 0;
+            pthread_mutex_lock(&dict_lock[key-1]);
+            if( !dictionary[key-1].empty() )      // not empty
+            {
+                val = dictionary[key-1];
+                stat = 1;
+            }
+            pthread_mutex_unlock(&dict_lock[key-1]);
+            
+            pthread_mutex_lock(&print_lock);
+            if( stat )
+                cout << index << ":" << worker_thr_id << ":" << val << endl;
+            else
+                cout << "Key does not exist" << endl;
+            pthread_mutex_unlock(&print_lock);
+        }
     }
 
     close_client_socket_ceremony:
     close(client_socket_fd);
     printf(BRED "Disconnected from client" ANSI_RESET "\n");
-    // return NULL;
+}
+
+void *waiting(void *arg)
+{
+    threads *t = (threads *)arg;
+    while (true)
+    {
+        int *tmp = NULL;
+        pthread_mutex_lock(&lock_q);
+        if( client_q.empty() )
+        {
+            pthread_cond_wait(&signal_q, &lock_q);
+        }
+        tmp = client_q.front();
+        client_q.pop();
+        pthread_mutex_unlock(&lock_q);
+        
+        handle_connection(tmp, t->thread_id);
+    }
 }
 
 int main(int argc, char *argv[])
 {
+    if( argc != 2 )
+    {
+        printf("Usage: %s <number of worker threads in the thread pool>\n", argv[0]);
+        return 1;
+    }
+    int num_threads = atoi(argv[1]);
+    if( num_threads <= 0 )
+    {
+        printf("Number of threads must be positive\n");
+        return 2;
+    }
+
+    threads worker[num_threads];
+    int cur_thread_id = 0;
+
+    for( int i = 0; i < num_threads; i++ )
+    {
+        worker[i].id = cur_thread_id++;
+        pthread_create(&(worker[i].thread_id), NULL, waiting, (void *)&worker[i]);
+    }
+
+
     int wel_socket_fd, client_socket_fd, port_number;
     socklen_t clilen;
 
@@ -154,10 +323,14 @@ more precisely, a new socket that is dedicated to that particular client.
             perror("ERROR while accept() system call occurred in SERVER");
             exit(-1);
         }
-
         printf(BGRN "New client connected from port number %d and IP %s \n" ANSI_RESET, ntohs(client_addr_obj.sin_port), inet_ntoa(client_addr_obj.sin_addr));
-        
-        handle_connection(client_socket_fd);
+        int *client_fd = new int;
+        *client_fd = client_socket_fd;
+
+        pthread_mutex_lock(&lock_q);
+        client_q.push(client_fd);
+        pthread_cond_signal(&signal_q);
+        pthread_mutex_unlock(&lock_q);
     }
 
     close(wel_socket_fd);
