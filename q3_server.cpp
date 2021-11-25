@@ -6,7 +6,7 @@ pair<string, int> read_string_from_socket(const int &fd, int bytes)
     output.resize(bytes);
 
     int bytes_received = read(fd, &output[0], bytes - 1);
-    debug(bytes_received);
+    // debug(bytes_received);
     if (bytes_received <= 0)
     {
         cerr << "Failed to read data from socket. \n";
@@ -40,9 +40,11 @@ void handle_connection(int *p_client_socket_fd, pthread_t worker_thr_id)
 
     /* read message from client */
     int ret_val = 1;
+    int someth = 1;
 
-    while (true)
+    while (someth)
     {
+        someth = 0;
         string cmd;
         tie(cmd, received_num) = read_string_from_socket(client_socket_fd, buff_sz);
         ret_val = received_num;
@@ -52,33 +54,23 @@ void handle_connection(int *p_client_socket_fd, pthread_t worker_thr_id)
         {
             // perror("Error read()");
             printf("Server could not read msg sent from client\n");
-            goto close_client_socket_ceremony;
+            break;
         }
-        cout << "Client sent : " << cmd << endl;
+        // cout << "Client sent : " << cmd << endl;
         if (cmd == "exit")
         {
             cout << "Exit pressed by client" << endl;
-            goto close_client_socket_ceremony;
-        }
-        string msg_to_send_back = "Ack: " + cmd;
-
-        ////////////////////////////////////////
-        // "If the server write a message on the socket and then close it before the client's read. Will the client be able to read the message?"
-        // Yes. The client will get the data that was sent before the FIN packet that closes the socket.
-
-        int sent_to_client = send_string_on_socket(client_socket_fd, msg_to_send_back);
-        // debug(sent_to_client);
-        if (sent_to_client == -1)
-        {
-            perror("Error while writing to client. Seems socket has been closed");
-            goto close_client_socket_ceremony;
+            break;
         }
 
+        string msg_to_send_back = "";
         istringstream args(cmd);
         string key_str;
+        // cout << "before_keystr\n";
         args >> key_str;
-
+        // cout << "after_ " << key_str << "\n";
         int index = stoi(key_str);
+        // debug(index);
 
         string cmd_name;
         string value;
@@ -88,12 +80,14 @@ void handle_connection(int *p_client_socket_fd, pthread_t worker_thr_id)
         int stat = 0;
         if( key < 0 || key > 100 )
         {
-            cout << "Invalid key" << endl;
-            goto close_client_socket_ceremony;
+            msg_to_send_back += "arguments: Invalid key";
+            goto send_msg_to_client;
         }
 
-        if( cmd_name != "delete" || cmd_name != "fetch" )
+        if( cmd_name != "delete" && cmd_name != "fetch" )
             args >> value;
+        
+        msg_to_send_back = "Ack: " + to_string(index) + ":" + to_string(worker_thr_id) + ":";
 
         if( cmd_name == "insert" )
         {
@@ -106,12 +100,10 @@ void handle_connection(int *p_client_socket_fd, pthread_t worker_thr_id)
             }
             pthread_mutex_unlock(&dict_lock[key-1]);
             
-            pthread_mutex_lock(&print_lock);
             if( stat )
-                cout << index << ":" << worker_thr_id << ":" << "Insertion successful" << endl;
+                msg_to_send_back += "Insertion successful" ;
             else
-                cout << "key already exists" << endl;
-            pthread_mutex_unlock(&print_lock);
+                msg_to_send_back += "key already exists";
         }
 
         else if( cmd_name == "concat" )
@@ -120,13 +112,20 @@ void handle_connection(int *p_client_socket_fd, pthread_t worker_thr_id)
             int key2 = stoi(value);
             if( key2 < 0 || key2 > 100 )
             {
-                cout << "Invalid key" << endl;
-                goto close_client_socket_ceremony;
+                msg_to_send_back += "arguments: Invalid key" ;
+                goto send_msg_to_client;
             }
             string s1, s2; 
-    
-            pthread_mutex_lock(&dict_lock[key-1]);   
-            pthread_mutex_lock(&dict_lock[key2-1]);
+            int t = key, t2 = key2;
+            
+            if( t > t2 )        // always acquire locks in ascending order
+            {
+                t = key2;
+                t2 = key;
+            }
+
+            pthread_mutex_lock(&dict_lock[t-1]);   
+            pthread_mutex_lock(&dict_lock[t2-1]);
             if( !dictionary[key-1].empty() && !dictionary[key2-1].empty() )
             {
                 s1 = dictionary[key-1] + dictionary[key2-1];
@@ -135,15 +134,13 @@ void handle_connection(int *p_client_socket_fd, pthread_t worker_thr_id)
                 dictionary[key2-1] = s2;
                 stat = 1;
             }
-            pthread_mutex_unlock(&dict_lock[key2-1]);
-            pthread_mutex_unlock(&dict_lock[key-1]);
+            pthread_mutex_unlock(&dict_lock[t-1]);
+            pthread_mutex_unlock(&dict_lock[t2-1]);
             
-            pthread_mutex_lock(&print_lock);
             if( stat )
-                cout << index << ":" << worker_thr_id << ":" << s2 << endl;
+                msg_to_send_back += s2;
             else
-                cout << "concat failed as at least one of the keys does not exist" << endl;
-            pthread_mutex_unlock(&print_lock);
+                msg_to_send_back += "concat failed as at least one of the keys does not exist";
         }
 
         else if( cmd_name == "update" )
@@ -157,12 +154,10 @@ void handle_connection(int *p_client_socket_fd, pthread_t worker_thr_id)
             }
             pthread_mutex_unlock(&dict_lock[key-1]);
             
-            pthread_mutex_lock(&print_lock);
             if( stat )
-                cout << index << ":" << worker_thr_id << ":" << value << endl;
+                msg_to_send_back += value;
             else
-                cout << "key already exists" << endl;
-            pthread_mutex_unlock(&print_lock);
+                msg_to_send_back += "key already exists";
         }
 
         if( cmd_name == "delete" )
@@ -176,15 +171,13 @@ void handle_connection(int *p_client_socket_fd, pthread_t worker_thr_id)
             }
             pthread_mutex_unlock(&dict_lock[key-1]);
             
-            pthread_mutex_lock(&print_lock);
             if( stat )
-                cout << index << ":" << worker_thr_id << ":" << "Deletion successful" << endl;
+                msg_to_send_back += "Deletion successful";
             else
-                cout << "No such key exists" << endl;
-            pthread_mutex_unlock(&print_lock);
+                msg_to_send_back += "No such key exists";
         }
 
-        if( cmd_name == "fetch" )
+        else if( cmd_name == "fetch" )
         {
             string val;
             stat = 0;
@@ -196,16 +189,25 @@ void handle_connection(int *p_client_socket_fd, pthread_t worker_thr_id)
             }
             pthread_mutex_unlock(&dict_lock[key-1]);
             
-            pthread_mutex_lock(&print_lock);
             if( stat )
-                cout << index << ":" << worker_thr_id << ":" << val << endl;
+                msg_to_send_back += val ;
             else
-                cout << "Key does not exist" << endl;
-            pthread_mutex_unlock(&print_lock);
+                msg_to_send_back += "Key does not exist";
+        }
+
+        ////////////////////////////////////////
+           // "If the server write a message on the socket and then close it before the client's read. Will the client be able to read the message?"
+           // Yes. The client will get the data that was sent before the FIN packet that closes the socket.
+        send_msg_to_client:
+        // cout << "\n" << "here " << msg_to_send_back << endl;
+        int sent_to_client = send_string_on_socket(client_socket_fd, msg_to_send_back);
+        // debug(sent_to_client);
+        if (sent_to_client == -1)
+        {
+            perror("Error while writing to client. Seems socket has been closed");
         }
     }
-
-    close_client_socket_ceremony:
+    
     close(client_socket_fd);
     printf(BRED "Disconnected from client" ANSI_RESET "\n");
 }
@@ -333,6 +335,25 @@ more precisely, a new socket that is dedicated to that particular client.
         pthread_mutex_unlock(&lock_q);
     }
 
+    for( int i = 0; i < num_threads; i++ )
+        pthread_join(worker[1].thread_id, NULL);
+
     close(wel_socket_fd);
     return 0;
 }
+
+/**
+11
+1 insert 1 hello
+2 insert 1 hello
+2 insert 2 yes
+2 insert 3 no
+3 concat 1 2
+3 concat 1 3 
+4 delete 3
+5 delete 4
+6 concat 1 4
+7 update 1 final
+8 concat 1 2
+
+**/

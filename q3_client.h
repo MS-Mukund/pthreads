@@ -9,17 +9,14 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 
-// threads
-#include <pthread.h>
-#include <semaphore.h>
-
 /////////////////////////////
+#include <pthread.h>
 #include <iostream>
+#include <semaphore.h>
 #include <assert.h>
-#include <tuple>
-
+#include <queue>
 #include <vector>
-#include <queue>  // std::queue
+#include <tuple>
 #include <sstream>
 using namespace std;
 /////////////////////////////
@@ -35,29 +32,23 @@ using namespace std;
 #define ANSI_RESET "\x1b[0m"
 
 typedef long long LL;
-
+const LL MOD = 1000000007;
+#define part cout << "-----------------------------------" << endl;
 #define pb push_back
 #define debug(x) cout << #x << " : " << x << endl
-#define part cout << "-----------------------------------" << endl;
 
 ///////////////////////////////
-#define MAX_CLIENTS 44
-#define PORT_ARG 8001
-#define MAX_SZ 100
-
-const int initial_msg_len = 256;
-const LL buff_sz = 1048576;
+#define SERVER_PORT 8001
 ////////////////////////////////////
-string dictionary[ 2*MAX_SZ+5 ] = {""}; 
-pthread_mutex_t dict_lock[ 2*MAX_SZ+5 ] = {PTHREAD_MUTEX_INITIALIZER};
 
-typedef struct thread_info {
+const LL buff_sz = 1048576;
+//////////////////////////////////////////////////
+typedef struct client_info {
     pthread_t thread_id;
-    int id;
-}threads;
+    string msg;
+    int time;
+} c_info;
 
-void *waiting(void *arg);
-
-queue<int *> client_q;
-pthread_mutex_t lock_q = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t signal_q = PTHREAD_COND_INITIALIZER;
+c_info *client_list;    // points to list of all client threads
+sem_t imaginary_sem;
+pthread_mutex_t print_lock = PTHREAD_MUTEX_INITIALIZER;

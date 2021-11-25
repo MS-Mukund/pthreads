@@ -307,7 +307,8 @@ void *start_stud(void *args)
         if( rand_num < (all_courses[s->pref[pref_ind]].interest)*(s->calibre)*1000 )
         {
             print_E3(id, all_courses[s->pref[pref_ind]].name);
-            
+
+        // if course withdrawn or student withdraws from course    
         removed:
             pref_ind++;
             

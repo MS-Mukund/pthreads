@@ -1,47 +1,5 @@
-#include <stdio.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/stat.h>
-#include <netinet/in.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <arpa/inet.h>
-#include <fcntl.h>
-
-/////////////////////////////
-#include <pthread.h>
-#include <iostream>
-#include <semaphore.h>
-#include <assert.h>
-#include <queue>
-#include <vector>
-#include <tuple>
-using namespace std;
-/////////////////////////////
-
-//Regular bold text
-#define BBLK "\e[1;30m"
-#define BRED "\e[1;31m"
-#define BGRN "\e[1;32m"
-#define BYEL "\e[1;33m"
-#define BBLU "\e[1;34m"
-#define BMAG "\e[1;35m"
-#define BCYN "\e[1;36m"
-#define ANSI_RESET "\x1b[0m"
-
-typedef long long LL;
-const LL MOD = 1000000007;
-#define part cout << "-----------------------------------" << endl;
-#define pb push_back
-#define debug(x) cout << #x << " : " << x << endl
-
-///////////////////////////////
-#define SERVER_PORT 8001
-////////////////////////////////////
-
-const LL buff_sz = 1048576;
-///////////////////////////////////////////////////
+#include "q3_client.h"
+///////////////////////////////////////
 pair<string, int> read_string_from_socket(int fd, int bytes)
 {
     std::string output;
@@ -63,12 +21,11 @@ pair<string, int> read_string_from_socket(int fd, int bytes)
     return {output, bytes_received};
 }
 
-int send_string_on_socket(int fd, const string &s)
+int send_string_on_socket(int fd, string &s)
 {
     // cout << "We are sending " << s << endl;
     int bytes_sent = write(fd, s.c_str(), s.length());
     // debug(bytes_sent);
-    // debug(s);
     if (bytes_sent < 0)
     {
         cerr << "Failed to SEND DATA on socket.\n";
@@ -120,31 +77,90 @@ int get_socket_fd(struct sockaddr_in *ptr)
 }
 ////////////////////////////////////////////////////////
 
-void begin_process()
+void begin_process(string &strs)
 {
     struct sockaddr_in server_obj;
     int socket_fd = get_socket_fd(&server_obj);
 
+    // pthread_mutex_lock(&print_lock);
+    // cout << "Connection to server successful" << endl;
+    // pthread_mutex_unlock(&print_lock);
 
-    cout << "Connection to server successful" << endl;
-    
-    while (true)
+    send_string_on_socket(socket_fd, strs);
+    // cout << "here\n";
+    int num_bytes_read;
+    string output_msg;
+    tie(output_msg, num_bytes_read) = read_string_from_socket(socket_fd, buff_sz);
+    istringstream iss(output_msg);
+    string ack;
+    iss >> ack;
+    if( ack != "Ack:")
     {
-        string to_send;
-        cout << "Enter msg: ";
-        getline(cin, to_send);
-        send_string_on_socket(socket_fd, to_send);
-        int num_bytes_read;
-        string output_msg;
-        tie(output_msg, num_bytes_read) = read_string_from_socket(socket_fd, buff_sz);
-        cout << "Received: " << output_msg << endl;
-        cout << "====" << endl;
+        cout << "error: server has not acknowledged msg" << endl;
+        return;
     }
-    // part;
+
+    pthread_mutex_lock(&print_lock);
+    while( iss >> ack )
+        cout << ack << " ";
+    cout << endl;
+    pthread_mutex_unlock(&print_lock);
+}   
+
+void *thread_func(void *args)
+{
+    c_info *cli = (c_info *)args;
+
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    ts.tv_sec += cli->time;
+
+    sem_timedwait(&imaginary_sem, &ts);     //acts as a timer
+
+    // cout << "then " << cli->msg << endl;
+    begin_process(cli->msg);
+
+    return NULL;
 }
 
 int main(int argc, char *argv[])
 {
-    begin_process();
+    int m;
+    cin >> m;
+
+    client_list = new c_info[m];
+    sem_init(&imaginary_sem, 0, 0);
+
+    for (int i = 0; i < m; i++)
+    {
+        int time;
+        string cmd, key;
+        cin >> time >> cmd >> key;
+
+        string key2;
+        if( cmd != "delete" && cmd != "fetch" )
+        {
+            cin >> key2;
+            client_list[i].msg = to_string(i) + " " + cmd + " " + key + " " + key2;
+        }
+
+        else
+        {
+            client_list[i].msg = to_string(i) + " " + cmd + " " + key;
+        }
+        client_list[i].time = time;
+    }
+
+    for( int i = 0; i < m; i++)
+    {
+        pthread_create(&client_list[i].thread_id, NULL, thread_func, (void *)&client_list[i]);
+    }
+    
+    for( int i = 0; i < m; i++)
+    {
+        pthread_join(client_list[i].thread_id, NULL);
+    }
+    // cout << "finished" << endl;
+    
     return 0;
 }
