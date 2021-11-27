@@ -353,70 +353,70 @@ void destroy()
 void print_E1( int id )
 {
     pthread_mutex_lock(&print_lock);
-    printf( "Student %d has filled in preferences for course registration\n", id);
+    printf( GREEN"Student %d has filled in preferences for course registration\n"NORMAL, id);
     pthread_mutex_unlock(&print_lock);
 }
 
 void print_E2( int id, char *name )
 {
     pthread_mutex_lock(&print_lock);
-    printf( "Student %d has been allocated a seat in course %s\n", id, name);
+    printf( BLUE"Student %d has been allocated a seat in course %s\n"NORMAL, id, name);
     pthread_mutex_unlock(&print_lock);
 }
 
 void print_E3( int id, char *name )
 {
     pthread_mutex_lock(&print_lock);
-    printf( "Student %d has withdrawn from course %s\n", id, name);
+    printf( RED"Student %d has withdrawn from course %s\n"NORMAL, id, name);
     pthread_mutex_unlock(&print_lock);
 }
 
 void print_E4( int id, int priority, char *pref1, char *pref2 )
 {
     pthread_mutex_lock(&print_lock);
-    printf( "Student %d has changed current preference from %s (priority %d) to %s (priority %d)\n", id, pref1, priority, pref2, priority+1);
+    printf( CYAN"Student %d has changed current preference from %s (priority %d) to %s (priority %d)\n"NORMAL, id, pref1, priority, pref2, priority+1);
     pthread_mutex_unlock(&print_lock);
 }
 
 void print_E5( int id, char *name )
 {
     pthread_mutex_lock(&print_lock);
-    printf( "Student %d has selected course %s permanently\n", id, name);
+    printf( MAGENTA"Student %d has selected course %s permanently\n"NORMAL, id, name);
     pthread_mutex_unlock(&print_lock);
 }
 
 void print_E6( int id )
 {
     pthread_mutex_lock(&print_lock);
-    printf( "Student %d could not get any of his preferred courses\n", id);
+    printf( WHITE"Student %d could not get any of his preferred courses\n"NORMAL, id);
     pthread_mutex_unlock(&print_lock);
 }
 
 void print_E7( char *name, int seats )
 {
     pthread_mutex_lock(&print_lock);
-    printf( "Course %s has been allocated %d seats\n", name, seats);
+    printf( YELLOW"Course %s has been allocated %d seats\n"NORMAL, name, seats);
     pthread_mutex_unlock(&print_lock);
 }
 
 void print_E8( char *name, int filled, int seats)
 {
     pthread_mutex_lock(&print_lock);
-    printf( "Tutorial has started for Course %s with %d seats filled out of %d\n", name, filled, seats);
+    printf( GREEN"Tutorial has started for Course %s with %d seats filled out of %d\n"NORMAL, name, filled, seats);
     pthread_mutex_unlock(&print_lock);
 }
 
 void print_E9( int ta_id, char *l_name, char *name )
 {
     pthread_mutex_lock(&print_lock);
-    printf( "TA %d from lab %s has completed the tutorial and left the course %s\n", ta_id, l_name, name);
+    printf( BLUE"TA %d from lab %s has completed the tutorial and left the course %s\n"NORMAL, ta_id, l_name, name);
     pthread_mutex_unlock(&print_lock);
 }
 
 void print_E10( char *name )
 {
     pthread_mutex_lock(&print_lock);
-    printf( "Course %s doesn’t have any TA’s eligible and is removed from course offerings\n", name);
+    printf( MAGENTA"Course %s doesn’t have any TA’s eligible and is removed from course offerings\n"NORMAL, name);
     pthread_mutex_unlock(&print_lock);
 }
 
@@ -434,14 +434,14 @@ void print_E11( int ta_id, char *l_name, char *name, int num )
         strcpy(filler, "th");
     
     pthread_mutex_lock(&print_lock);
-    printf( "TA %d from lab %s has been allocated to course %s for %d%s TA ship\n", ta_id, l_name, name, num, filler);
+    printf( RED"TA %d from lab %s has been allocated to course %s for %d%s TA ship\n"NORMAL, ta_id, l_name, name, num, filler);
     pthread_mutex_unlock(&print_lock);
 }
 
 void print_E12( char *l_name )
 {
     pthread_mutex_lock(&print_lock);
-    printf( "Lab %s no longer has students available for TA ship\n", l_name);
+    printf( CYAN"Lab %s no longer has students available for TA ship\n"NORMAL, l_name);
     pthread_mutex_unlock(&print_lock);
 }
 
