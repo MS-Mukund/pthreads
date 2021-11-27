@@ -62,22 +62,6 @@ int main()
         scanf("%s%d%f", goals[i].team, &goals[i].time, &goals[i].prob);
     }
 
-    // for( int ct = 0; ct < num_grps; ct++)
-    // {
-    //     printf("%d\n", grp_l[ct].rem_friends);
-        
-    //     for( int ct2 = 0; ct2 < grp_l[ct].rem_friends; ct2++)
-    //     {
-    //         printf("%s %s %d %d %d\n", grp_l[ct].fan_l[ct2].name, grp_l[ct].fan_l[ct2].zone, grp_l[ct].fan_l[ct2].reach_t, grp_l[ct].fan_l[ct2].patience, grp_l[ct].fan_l[ct2].num_goals);
-    //     }
-    // }
-
-    // printf("%d\n", num_goals);
-    // for( int i = 0; i < num_goals ; i++)
-    // {
-        // printf("%s %d %f\n", goals[i].team, goals[i].time, goals[i].prob);
-    // }
-
     pthread_create(&goal_thr, NULL, goal_scored, (void *)&num_goals);
     for( int ct = 0; ct < num_grps; ct++)
     {

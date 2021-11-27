@@ -1,6 +1,6 @@
 * Run `gcc q1.c -lpthread` and then `./a.out` to run the program. 
 
-**main()**:
+**Main**:
 1. Initially, the program takes all the required input. Then it creates a thread using pthread_create() for each course and for each student. 
    
 2. Finally, main, waits for each thread (both for student and course) to finish using pthread_join().  
