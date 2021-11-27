@@ -95,7 +95,6 @@ int main()
             pthread_join(grp_l[ct].fan_l[ct2].fan_t_id, NULL);
             // printf("what\n");
         }
-        // printf("here22\n");
     }  
     // printf( "done with students\n");
     pthread_join(goal_thr, NULL);
@@ -115,6 +114,7 @@ int signal_relevant_zone(int indicator)
 
         pthread_mutex_lock(&hfq_lock);
         pthread_cond_signal(&hfan_q);
+        // printf("broadcasted h\n");
         pthread_mutex_unlock(&hfq_lock);
 
         return 1;
@@ -125,6 +125,7 @@ int signal_relevant_zone(int indicator)
 
         pthread_mutex_lock(&nfq_lock);
         pthread_cond_signal(&nfan_q);
+        // printf("broadcasted\n");
         pthread_mutex_unlock(&nfq_lock);
 
         return 2;
@@ -135,6 +136,7 @@ int signal_relevant_zone(int indicator)
 
         pthread_mutex_lock(&afq_lock);
         pthread_cond_signal(&afan_q);
+        // printf("broadcasted a\n");
         pthread_mutex_unlock(&afq_lock);
 
         return 3;
@@ -177,16 +179,19 @@ void *fan_func(void *args)
         {
             pthread_mutex_lock(&afq_lock);
             time_ret = pthread_cond_timedwait(&afan_q, &afq_lock, &ts);
-            if( errno == ETIMEDOUT)     // waited in q, couldn't get seat
+            // printf("received %d\n", time_ret);
+            if( errno == ETIMEDOUT || time_ret == ETIMEDOUT )     // waited in q, couldn't get seat
             {
                 print_E3(fan->name);
                 stat = -1;
-                return NULL;
+                pthread_mutex_unlock(&afq_lock);
+                goto end;
             }
             pthread_mutex_unlock(&afq_lock);
 
             if( time_ret == 0)      
             {
+                // printf("trying\n");
                 sem_trywait(&azone_sem);
                 if( sem_ret == 0)
                 {
@@ -196,7 +201,6 @@ void *fan_func(void *args)
             }
 
             // if stat is still zero, it means some bogus signal came
-
         }   
     }
 
@@ -206,6 +210,7 @@ void *fan_func(void *args)
         if( sem_ret == 0)
         {
             print_E2(fan->name, 'H');
+            // printf("%d\n", cur_goals_away);
             stat = 1;
         }
         else
@@ -228,7 +233,8 @@ void *fan_func(void *args)
             {
                 print_E3(fan->name);
                 stat = -1;
-                return NULL;
+                pthread_mutex_unlock(&hfq_lock);
+                goto end;
             }
             pthread_mutex_unlock(&hfq_lock);
 
@@ -251,15 +257,15 @@ void *fan_func(void *args)
 
     else if( fan->zone[0] == 'N')
     {
-        if( ( sem_ret = sem_trywait(&hzone_sem) ) == 0 )            // try for home zone seat
-        {
-            print_E2(fan->name, 'H');
-            stat = 1;
-        }
-        else if( ( sem_ret = sem_trywait(&nzone_sem) ) == 0 )       // try for neutral zone seat
+        if( ( sem_ret = sem_trywait(&nzone_sem) ) == 0 )            // try for home zone seat
         {
             print_E2(fan->name, 'N');
             stat = 2;
+        }
+        else if( ( sem_ret = sem_trywait(&hzone_sem) ) == 0 )       // try for neutral zone seat
+        {
+            print_E2(fan->name, 'H');
+            stat = 1;
         }
         else if( ( sem_ret = sem_trywait(&azone_sem) ) == 0 )       // try for away zone seat
         {
@@ -277,21 +283,22 @@ void *fan_func(void *args)
             {
                 print_E3(fan->name);
                 stat = -1;
-                return NULL;
+                pthread_mutex_unlock(&nfq_lock);
+                goto end;
             }
             pthread_mutex_unlock(&nfq_lock);
 
             if( time_ret == 0)      
             {
-                if( (sem_ret = sem_trywait(&hzone_sem) ) == 0)
-                {
-                    print_E2(fan->name, 'H');
-                    stat = 1;
-                }
-                else if( ( sem_ret = sem_trywait(&nzone_sem) ) == 0)
+                if( (sem_ret = sem_trywait(&nzone_sem) ) == 0)
                 {
                     print_E2(fan->name, 'N');
                     stat = 2;
+                }
+                else if( ( sem_ret = sem_trywait(&hzone_sem) ) == 0)
+                {
+                    print_E2(fan->name, 'H');
+                    stat = 1;
                 }
                 else if( ( sem_ret = sem_trywait(&azone_sem) ) == 0)
                 {
@@ -317,13 +324,16 @@ void *fan_func(void *args)
 
     else if( fan->zone[0] == 'A')
     {
-       // watches until rage limit 
+        int var = 1;
+       // watches until home team scores a certain no of goals
+    //    printf("%d %s\n", cur_goals_home, fan->name);
        while( cur_goals_home < fan->num_goals )
        {
            pthread_mutex_lock(&hgoal_lock);
            pthread_cond_timedwait(&home_sig, &hgoal_lock, &ts);
            if( errno == ETIMEDOUT )
            {
+               var = 0;
                print_E4(fan->name);
                pthread_mutex_unlock(&hgoal_lock);
                break;
@@ -335,7 +345,7 @@ void *fan_func(void *args)
                break;
            }
        }
-       if( cur_goals_home >= fan->num_goals )
+       if( var == 1 )
             print_E5(fan->name);
        
        fan->state = exit_wait;
@@ -344,33 +354,38 @@ void *fan_func(void *args)
 
     else if( fan->zone[0] == 'H')
     {
-       // watches until rage limit 
-       while( cur_goals_away <= fan->num_goals )
+        int var = 1;
+       // watches until away team scores a certain number of goals
+    //    printf("%d %s\n", cur_goals_away, fan->name); 
+       while( cur_goals_away < fan->num_goals )
        {
            pthread_mutex_lock(&agoal_lock);
            pthread_cond_timedwait(&away_sig, &agoal_lock, &ts);
            if( errno == ETIMEDOUT )
            {
+               var = 0;
                print_E4(fan->name);
-               fan->state = exit_wait;
-               signal_relevant_zone(stat);
                pthread_mutex_unlock(&agoal_lock);
                break;
            }
            pthread_mutex_unlock(&agoal_lock);
 
-           if( cur_goals_away > fan->num_goals )
+           if( cur_goals_away >= fan->num_goals )
            {
-               print_E5(fan->name);
-               fan->state = exit_wait;
-               signal_relevant_zone(stat);
+               printf("okay, cool\n");
                break;
            }
        }
+       if( var == 1 )
+            print_E5(fan->name);
+
+       fan->state = exit_wait;
+       signal_relevant_zone(stat);
     }
-    // printf("done watching\n");
+    
 
     // he's done watching, waiting for friends
+    end:
     print_E6(fan->name);
     int tmp;
     pthread_mutex_lock(&grp_l[fan->g_id].lock);
@@ -560,4 +575,24 @@ A 2 0.95
 A 3 0.5
 H 5 0.85
 H 6 0.4 
+ */
+
+/**
+2 1 2
+3 2 3
+Vibhav A 3 2 1
+Sarthak H 1 3 1
+Ayush A 2 1 1
+4
+Rachit H 1 2 1
+Roshan H 2 1 1 
+Adarsh A 1 2 5
+Pranav H 3 1 1
+5
+H 1 1
+A 2 1
+A 3 1
+H 4 1
+A 5 1
+ 
  */
