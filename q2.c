@@ -462,42 +462,42 @@ void destroy()
 void print_E1( char *name )
 {
     pthread_mutex_lock(&print_lock);
-    printf( "%s has reached the stadium\n", name );
+    printf( RED"%s has reached the stadium\n"NORMAL, name );
     pthread_mutex_unlock(&print_lock);
 }
 
 void print_E2( char *name, char zone )
 {
     pthread_mutex_lock(&print_lock);
-    printf( "%s has got a seat in zone %c\n", name, zone );
+    printf( CYAN"%s has got a seat in zone %c\n"NORMAL, name, zone );
     pthread_mutex_unlock(&print_lock);
 }
 
 void print_E3(char *name )
 {
     pthread_mutex_lock(&print_lock);
-    printf( "%s couldn't get a seat\n", name);
+    printf( MAGENTA"%s couldn't get a seat\n"NORMAL, name);
     pthread_mutex_unlock(&print_lock);
 }
 
 void print_E4( char *name )
 {
     pthread_mutex_lock(&print_lock);
-    printf( "%s watched the match for %d seconds and is leaving \n", name, spec_time );
+    printf( GREEN"%s watched the match for %d seconds and is leaving \n"NORMAL, name, spec_time );
     pthread_mutex_unlock(&print_lock);
 }
 
 void print_E5( char *name )
 {
     pthread_mutex_lock(&print_lock);
-    printf( "%s is leaving due to the bad defensive performance of his team\n", name);
+    printf( GREEN"%s is leaving due to the bad defensive performance of his team\n"NORMAL, name);
     pthread_mutex_unlock(&print_lock);
 }
 
 void print_E6( char *name)
 {
     pthread_mutex_lock(&print_lock);
-    printf( "%s is waiting for their friends at the exit\n", name);
+    printf( BLUE"%s is waiting for their friends at the exit\n"NORMAL, name);
     pthread_mutex_unlock(&print_lock);
 }
 
@@ -514,7 +514,7 @@ void print_E7( char name, int num )
         strcpy(filler, "th");
 
     pthread_mutex_lock(&print_lock);
-    printf( "Team %c have scored their %d%s goal\n", name, num, filler);
+    printf( "Team %c have scored their %d%s goal\n"NORMAL, name, num, filler);
     pthread_mutex_unlock(&print_lock);
 }
 
